@@ -1,0 +1,292 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// STREAK TABLES
+// ============================================
+
+model Streak {
+  id                 String   @id @default(uuid())
+  userId             BigInt
+  creatorId          BigInt
+  streakType         String
+  currentCount       Int      @default(0)
+  longestCount       Int      @default(0)
+  lastActivityDate   DateTime @db.Date
+  streakStartDate    DateTime @db.Date
+  isActive           Boolean  @default(true)
+  nextMilestone      Int?
+  milestoneProgress  Int      @default(0)
+  freezeAvailable    Boolean  @default(true)
+  freezeUsedCount    Int      @default(0)
+  freezeLastUsed     DateTime?
+  metadata           Json     @default("{}")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  creator            Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  history            StreakHistory[]
+  freezes            StreakFreeze[]
+  events             StreakEvent[]
+
+  @@unique([userId, creatorId, streakType], name: "uq_user_creator_type")
+  @@index([userId])
+  @@index([creatorId])
+  @@index([creatorId, isActive])
+  @@index([lastActivityDate])
+  @@map("streaks")
+}
+
+model StreakHistory {
+  id                String   @id @default(uuid())
+  streakId          String
+  userId            BigInt
+  creatorId         BigInt
+  streakType        String
+  eventType         String
+  previousCount     Int?
+  newCount          Int
+  milestoneAchieved Int?
+  reason            String?
+  snapshot          Json     @default("{}")
+  createdAt         DateTime @default(now())
+
+  streak            Streak   @relation(fields: [streakId], references: [id], onDelete: Cascade)
+
+  @@index([streakId])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@map("streak_history")
+}
+
+model StreakEvent {
+  id             String   @id @default(uuid())
+  userId         BigInt
+  creatorId      BigInt
+  streakType     String
+  eventDate      DateTime @db.Date
+  activityCount  Int      @default(1)
+  qualified      Boolean  @default(true)
+  eventSource    String
+  sourceEventId  String
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  streak         Streak   @relation(fields: [userId, creatorId, streakType], references: [userId, creatorId, streakType])
+
+  @@unique([userId, creatorId, streakType, eventDate, sourceEventId], name: "uq_streak_event")
+  @@index([userId, eventDate(sort: Desc)])
+  @@index([creatorId, eventDate(sort: Desc)])
+  @@index([qualified])
+  @@map("streak_events")
+}
+
+model StreakFreeze {
+  id                  String   @id @default(uuid())
+  userId              BigInt
+  creatorId           BigInt
+  streakType          String
+  freezeDate          DateTime @db.Date
+  streakCountAtFreeze Int
+  reason              String?
+  createdAt           DateTime @default(now())
+
+  streak              Streak   @relation(fields: [userId, creatorId, streakType], references: [userId, creatorId, streakType], onDelete: Cascade)
+
+  @@index([userId, freezeDate(sort: Desc)])
+  @@index([creatorId, freezeDate(sort: Desc)])
+  @@map("streak_freezes")
+}
+
+// ============================================
+// BADGE TABLES
+// ============================================
+
+model Badge {
+  id                     String          @id @default(uuid())
+  badgeCode              String          @unique
+  badgeCategory          String
+  name                   String
+  description            String?
+  iconUrl                String?
+  rarity                 String          @default("common")
+  points                 Int             @default(0)
+  displayOrder           Int             @default(0)
+  isActive               Boolean         @default(true)
+  isCreatorCustomizable  Boolean         @default(false)
+  requiredBadgeId        String?
+  metadata               Json            @default("{}")
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  requiredBadge          Badge?          @relation("BadgePrerequisite", fields: [requiredBadgeId], references: [id])
+  prerequisiteBadges     Badge[]         @relation("BadgePrerequisite")
+  criteria               BadgeCriteria[]
+  userBadges             UserBadge[]
+  badgeProgress          BadgeProgress[]
+
+  @@index([badgeCategory])
+  @@index([isActive])
+  @@map("badges")
+}
+
+model BadgeCriteria {
+  id                 String   @id @default(uuid())
+  badgeId            String
+  criterionType      String
+  comparisonOperator String
+  thresholdValue     Decimal  @db.Decimal(10, 2)
+  timePeriodDays     Int?
+  streakType         String?
+  isRequired         Boolean  @default(true)
+  metadata           Json     @default("{}")
+  createdAt          DateTime @default(now())
+
+  badge              Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@index([badgeId])
+  @@map("badge_criteria")
+}
+
+model UserBadge {
+  id                 String   @id @default(uuid())
+  userId             BigInt
+  badgeId            String
+  creatorId          BigInt
+  awardedAt          DateTime @default(now())
+  awardedBy          String   @default("system")
+  awardReason        String?
+  progressPercentage Int      @default(100)
+  isDisplayed        Boolean  @default(true)
+  displayPriority    Int      @default(0)
+  metadata           Json     @default("{}")
+
+  badge              Badge    @relation(fields: [badgeId], references: [id])
+
+  @@unique([userId, badgeId, creatorId], name: "uq_user_badge")
+  @@index([userId, awardedAt(sort: Desc)])
+  @@index([creatorId])
+  @@index([badgeId])
+  @@map("user_badges")
+}
+
+model BadgeProgress {
+  id                String   @id @default(uuid())
+  userId            BigInt
+  badgeId           String
+  creatorId         BigInt
+  progressPercentage Int     @default(0)
+  currentValue      Decimal  @default(0) @db.Decimal(10, 2)
+  targetValue       Decimal  @default(0) @db.Decimal(10, 2)
+  lastUpdated       DateTime @default(now())
+
+  badge             Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId, creatorId], name: "uq_badge_progress")
+  @@index([userId, progressPercentage(sort: Desc)])
+  @@map("badge_progress")
+}
+
+// ============================================
+// CREATOR CONFIGURATION
+// ============================================
+
+model CreatorConfiguration {
+  id                   String   @id @default(uuid())
+  creatorId            BigInt   @unique
+  streakSettings       Json     @default("{}")
+  badgeSettings        Json     @default("{}")
+  leaderboardSettings  Json     @default("{}")
+  notificationSettings Json     @default("{}")
+  featureFlags         Json     @default("{}")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  creator              Creator  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@map("creator_configurations")
+}
+
+// ============================================
+// LEADERBOARDS
+// ============================================
+
+model Leaderboard {
+  id              String   @id @default(uuid())
+  creatorId       BigInt
+  leaderboardType String
+  periodStart     DateTime @db.Date
+  periodEnd       DateTime @db.Date
+  entries         Json     @default("[]")
+  lastRefreshed   DateTime @default(now())
+
+  @@index([creatorId, leaderboardType, periodStart(sort: Desc)])
+  @@map("leaderboards")
+}
+
+// ============================================
+// EXISTING TABLES (References)
+// ============================================
+
+model User {
+  id      BigInt @id
+  email   String @unique
+  name    String?
+
+  streaks Streak[]
+}
+
+model Creator {
+  id            BigInt @id
+  name          String
+  email         String @unique
+
+  streaks       Streak[]
+  configuration CreatorConfiguration?
+}
+
+// ============================================
+// ANALYTICS
+// ============================================
+
+model DailyStreakMetrics {
+  id                   BigInt   @id @default(autoincrement())
+  creatorId            BigInt
+  metricDate           DateTime @db.Date
+  totalActiveStreaks   Int      @default(0)
+  newStreaksStarted    Int      @default(0)
+  streaksBroken        Int      @default(0)
+  streaksFrozen        Int      @default(0)
+  milestonesAchieved   Int      @default(0)
+  avgStreakLength      Decimal? @db.Decimal(10, 2)
+  longestStreak        Int?
+  streakTypeBreakdown  Json     @default("{}")
+  createdAt            DateTime @default(now())
+
+  @@unique([creatorId, metricDate])
+  @@index([metricDate(sort: Desc)])
+  @@map("daily_streak_metrics")
+}
+
+model DailyBadgeMetrics {
+  id                     BigInt   @id @default(autoincrement())
+  creatorId              BigInt
+  metricDate             DateTime @db.Date
+  badgesAwarded          Int      @default(0)
+  uniqueUsersEarned      Int      @default(0)
+  topBadges              Json     @default("[]")
+  badgeCategoryBreakdown Json     @default("{}")
+  createdAt              DateTime @default(now())
+
+  @@unique([creatorId, metricDate])
+  @@index([metricDate(sort: Desc)])
+  @@map("daily_badge_metrics")
+}

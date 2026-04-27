@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test
+    ports:
+      - '5433:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: test
+      PORT: 3001
+      DATABASE_URL: postgresql://test:test@postgres-test:5432/test
+      REDIS_HOST: redis-test
+      REDIS_PORT: 6379
+      JWT_SECRET: test-secret
+    depends_on:
+      - postgres-test
+    command: >
+      sh -c "npx prisma migrate deploy && npx jest --ci --coverage"
+
+  redis-test:
+    image: redis:7-alpine
+    ports:
+      - '6380:6379'

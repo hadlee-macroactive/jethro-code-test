@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <circle cx="32" cy="32" r="30" fill="#fefce8" stroke="#eab308" stroke-width="3"/>
+  <!-- Diamond shape -->
+  <polygon points="32,8 52,32 32,56 12,32" fill="#eab308" stroke="#a16207" stroke-width="1"/>
+  <!-- Inner diamond highlight -->
+  <polygon points="32,16 44,32 32,48 20,32" fill="#fefce8" stroke="#eab308" stroke-width="0.5"/>
+  <!-- Facet lines -->
+  <line x1="32" y1="16" x2="32" y2="48" stroke="#eab308" stroke-width="0.5" opacity="0.5"/>
+  <line x1="20" y1="32" x2="44" y2="32" stroke="#eab308" stroke-width="0.5" opacity="0.5"/>
+  <!-- Number -->
+  <text x="32" y="36" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#a16207">180</text>
+</svg>
